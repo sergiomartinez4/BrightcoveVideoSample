@@ -1,9 +1,24 @@
 package com.brightcove.brightcovevideosample;
 
+import android.annotation.TargetApi;
+import android.app.Activity;
+import android.graphics.Color;
+import android.graphics.Point;
+import android.graphics.drawable.BitmapDrawable;
+import android.graphics.drawable.ColorDrawable;
+import android.graphics.drawable.StateListDrawable;
+import android.os.Build;
 import android.support.annotation.NonNull;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
+import android.view.Display;
+import android.view.Gravity;
+import android.view.View;
+import android.view.ViewGroup;
+import android.view.WindowManager;
+import android.widget.Button;
+import android.widget.ImageButton;
 import android.widget.LinearLayout;
 
 import com.brightcove.player.edge.Catalog;
@@ -60,9 +75,9 @@ public class MainActivity extends AppCompatActivity {
     private void initVideoView() {
         if (brightcoveVideoView == null) {
             LinearLayout linearLayout = (LinearLayout) findViewById(R.id.activity_main);
-            LinearLayout.LayoutParams layoutParams = new LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams layoutParams = new LinearLayout.LayoutParams (
                     LinearLayout.LayoutParams.MATCH_PARENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT
+                    getVideoHeight()
             );
 
             brightcoveVideoView = new BrightcoveExoPlayerVideoView(this);
@@ -70,17 +85,87 @@ public class MainActivity extends AppCompatActivity {
             brightcoveVideoView.finishInitialization();
 
             linearLayout.addView(brightcoveVideoView, layoutParams);
+            linearLayout.addView(createController());
         }
+    }
+
+    private int getVideoHeight() {
+        Point size = getDisplaySize();
+        int width;
+        int height;
+        if (size.x > size.y) {
+            height = size.x;
+            width = size.y;
+        } else {
+            width = size.x;
+            height = size.y;
+        }
+
+        return height/2;
+    }
+
+    @SuppressWarnings("deprecation")
+    @TargetApi(Build.VERSION_CODES.HONEYCOMB_MR2)
+    private Point getDisplaySize() {
+        WindowManager windowManager = (WindowManager) this.getApplicationContext().getSystemService(Activity.WINDOW_SERVICE);
+        Display display = windowManager.getDefaultDisplay();
+        Point point = new Point();
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB_MR2) {
+            display.getSize(point);
+        } else {
+            point.x = display.getWidth();
+            point.y = display.getHeight();
+        }
+        return point;
+    }
+
+    private LinearLayout createController() {
+        LinearLayout parent = new LinearLayout(this);
+
+        parent.setLayoutParams(new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        parent.setOrientation(LinearLayout.HORIZONTAL);
+        parent.setGravity(Gravity.CENTER_HORIZONTAL);
+
+        LinearLayout.LayoutParams buttonParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        buttonParams.gravity = Gravity.CENTER_HORIZONTAL;
+
+        Button btnPlay = new Button(this);
+        btnPlay.setBackground(makeSelector());
+        btnPlay.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                if (brightcoveVideoView != null) {
+                    if (brightcoveVideoView.isPlaying()) {
+                        brightcoveVideoView.getEventEmitter().emit(EventType.PAUSE);
+                    } else {
+                        brightcoveVideoView.getEventEmitter().emit(EventType.PLAY);
+                    }
+                }
+            }
+        });
+
+        parent.addView(btnPlay, buttonParams);
+        return parent;
+    }
+
+    private StateListDrawable makeSelector() {
+        StateListDrawable res = new StateListDrawable();
+        res.setExitFadeDuration(400);
+        res.setAlpha(45);
+        res.addState(new int[]{android.R.attr.state_pressed}, getResources().getDrawable(R.mipmap.play_pause_pressed));
+        res.addState(new int[]{}, getResources().getDrawable(R.mipmap.play_pause));
+        return res;
     }
 
     private void initListeners(@NonNull EventEmitter eventEmitter) {
         eventEmitter.on(EventType.PROGRESS, new EventListener() {
             @Override
             public void processEvent(Event event) {
-                Log.v(TAG, "Reporting progress: "+ event.getIntegerProperty(Event.PLAYHEAD_POSITION));
+                //Log.v(TAG, "Reporting progress: "+ event.getIntegerProperty(Event.PLAYHEAD_POSITION));
             }
         });
 
+        //For more on how the events work, please visit https://docs.brightcove.com/en/video-cloud/mobile-sdks/brightcove-player-sdk-for-android/getting-started/understanding-events.html
         EventListener myListener = new EventListener() {
             @Override
             public void processEvent(Event event) {
@@ -94,6 +179,8 @@ public class MainActivity extends AppCompatActivity {
                         break;
                     case EventType.DID_PAUSE:
                         break;
+                    default:
+                        break;
                 }
             }
         };
@@ -102,6 +189,10 @@ public class MainActivity extends AppCompatActivity {
         eventEmitter.on(EventType.DID_PLAY, myListener);
         eventEmitter.on(EventType.PAUSE, myListener);
         eventEmitter.on(EventType.DID_PAUSE, myListener);
+        eventEmitter.on(EventType.DID_PAUSE, myListener);
+        eventEmitter.on(EventType.VIDEO_SIZE_KNOWN, myListener);
+        eventEmitter.on(EventType.VIDEO_DURATION_CHANGED, myListener);
+        eventEmitter.on(EventType.DID_SET_VIDEO, myListener);
 
     }
 
